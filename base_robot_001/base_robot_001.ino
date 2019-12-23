@@ -12,21 +12,22 @@
   // Pin setup for RIGHT motor
   uint8_t rightMotor[4] = {9, 8, 7, 6};
   // Global variables used for motor
-  uint8_t go = 0;             // starting step for stepper motor position
-  uint8_t steps;              // tracks the number of steps in a routine
+  uint8_t stepCurrent = 0;              // Starting step for stepper motor position
+  uint8_t stepTotal = 0;                // Tracks the number of steps used so far in a routine
+  uint8_t msDelay = 3;                  // Amount of delay (in milliseconds) between motor steps
+  uint16_t usDelay = 2500;              // Amount of delay (in microseconds)
   
-  const uint8_t MM_STEP = 20; // One mm worth of steps
-  const uint8_t REVERSE_VAL = 5;  // Int value to start driving motor forward
-  const uint8_t FORWARD_VAL = 3;  // Int value to drive motors in reverse
+  const uint8_t BASE_MOVEMENT = 37;     // 2mm worth of steps to use as a base movement unit
+  const uint8_t REVERSE_VAL = 5;        // Int value to start driving motor forward
+  const uint8_t FORWARD_VAL = 3;        // Int value to drive motors in reverse
   
   boolean test = true;
 
 void robotSetup(void) {
   for (int i = 0; i < 4; i++) {
-  pinMode(leftMotor[i], OUTPUT);
-  pinMode(rightMotor[i], OUTPUT);
+    pinMode(leftMotor[i], OUTPUT);
+    pinMode(rightMotor[i], OUTPUT);
   }
-  steps = 0;
   pinMode(echo, INPUT);
   pinMode(trig, OUTPUT);
 }
@@ -37,13 +38,14 @@ void setup() {
 
 void loop() {
   //  need specsheet to get 1 step = x distance (we can get angle per step and we know radius of wheel (35mm) so opp/35mm = tan(step angle)
-  // so opp (distance per step) = 35mm * tan(step)  -- should be ~20 steps = 1mm if data correct - 5.6/64
+  // so opp (distance per step) = 35mm * tan(5.6/64 = 0.08789) = 35*tan(0.08789) = 35*0.00153398 = 0.05369 = 0.054mm per step
+  // 1/0.054 = 18.5 steps = 1mm so going to use base movement as 2mm = 37 steps
   while (!readSonar()){
-    while (steps < MM_STEP){
-      stepperSyncMove(3, FORWARD_VAL);   // speed, amount of steps (used for forwards or reverse)
-      steps++;
+    while (stepTotal < BASE_MOVEMENT){
+      stepperSyncMove(msDelay, FORWARD_VAL);   // speed, amount of steps (used for forwards or reverse)
+      stepTotal++;
     }
-    steps = 0;
+    stepTotal = 0;
   }
   stepperLeft90();
   while (readSonar()){
@@ -52,9 +54,9 @@ void loop() {
 }
   // This method can be used for forward and reverse - steplength 3 for forward, steplength 5 for reverse
 void stepperSyncMove(uint8_t _delay, uint8_t steplength){
-  stepperMoveSheet(leftMotor, go);   
-  stepperMoveSheet(rightMotor, go);    
-  go = (go + steplength) % 8;
+  stepperMoveSheet(leftMotor, stepCurrent);   
+  stepperMoveSheet(rightMotor, stepCurrent);    
+  stepCurrent = (stepCurrent + steplength) % 8;
   delay(_delay);
 }
   // Take an int value for left and right motor to determine direction
