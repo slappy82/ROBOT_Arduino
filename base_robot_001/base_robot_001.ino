@@ -1,16 +1,22 @@
 // Campbell Maxwell
 // 2019
 
+  //  need specsheet to get 1 step = x distance (we can get angle per step and we know radius of wheel (35mm) so opp/35mm = tan(step angle)
+  // so opp (distance per step) = 35mm * tan(5.6/64 = 0.08789) = 35*tan(0.08789) = 35*0.00153398 = 0.05369 = 0.054mm per step
+  // 1/0.054 = 18.5 steps = 1mm so going to use base movement as 2mm = 37 steps
+
   // SONAR
   // Pin setup for TRIG
-  uint8_t trig = 5;   
+  uint8_t trig = 3;   
   // Pin setup for ECHO 
-  uint8_t echo = 3;  
+  uint8_t echo = 2;  
   // STEPPER MOTORS
   // Pin setup for LEFT motor
-  uint8_t leftMotor[4] = {13, 12, 11, 10};
+  uint8_t leftMotor[4] = {22, 23, 24, 25};
   // Pin setup for RIGHT motor
-  uint8_t rightMotor[4] = {9, 8, 7, 6};
+  uint8_t rightMotor[4] = {26, 27, 28, 29};
+  // HM-10 BLE MODULE
+  uint8_t state = 20;
   // Global variables used for motor
   uint8_t stepCurrent = 0;              // Starting step for stepper motor position
   uint8_t stepTotal = 0;                // Tracks the number of steps used so far in a routine
@@ -20,8 +26,9 @@
   const uint8_t BASE_MOVEMENT = 37;     // 2mm worth of steps to use as a base movement unit
   const uint8_t REVERSE_VAL = 5;        // Int value to start driving motor forward
   const uint8_t FORWARD_VAL = 3;        // Int value to drive motors in reverse
-  
-  boolean test = true;
+
+  #define console Serial     // Used to communicate with the arduino console
+  #define btDevice Serial1   // Used to communicate with the HM-10 device
 
 void robotSetup(void) {
   for (int i = 0; i < 4; i++) {
@@ -37,9 +44,7 @@ void setup() {
 }
 
 void loop() {
-  //  need specsheet to get 1 step = x distance (we can get angle per step and we know radius of wheel (35mm) so opp/35mm = tan(step angle)
-  // so opp (distance per step) = 35mm * tan(5.6/64 = 0.08789) = 35*tan(0.08789) = 35*0.00153398 = 0.05369 = 0.054mm per step
-  // 1/0.054 = 18.5 steps = 1mm so going to use base movement as 2mm = 37 steps
+
   while (!readSonar()){
     while (stepTotal < BASE_MOVEMENT){
       stepperSyncMove(msDelay, FORWARD_VAL);   // speed, amount of steps (used for forwards or reverse)
@@ -59,19 +64,7 @@ void stepperSyncMove(uint8_t _delay, uint8_t steplength){
   stepCurrent = (stepCurrent + steplength) % 8;
   delay(_delay);
 }
-  // Take an int value for left and right motor to determine direction
-  // TODO: Look at refactoring syncmove method here, less code duplication etc
-void stepperMove(uint8_t left, uint8_t right){
-  uint8_t lMotorStep = 0; uint8_t rMotorStep = 0; int stepCount = 0;
-  while (stepCount < 500){
-    stepperMoveSheet(leftMotor, lMotorStep);   
-    stepperMoveSheet(rightMotor, rMotorStep);    
-    lMotorStep = (lMotorStep + left) % 8;
-    rMotorStep = (rMotorStep + right) % 8;
-    delay(3);
-    stepCount++;
-  }
-}
+
   // Turn the robot to the left by 90 degrees using the stepper motors
 void stepperLeft90(){
   stepperMove(REVERSE_VAL, FORWARD_VAL);
@@ -156,5 +149,19 @@ void stepperMoveSheet(uint8_t in[], int _step){
       digitalWrite(in[1], LOW);
       digitalWrite(in[0], LOW);
       break;
+  }
+}
+
+  // Take an int value for left and right motor to determine direction
+  // TODO: Look at refactoring syncmove method here, less code duplication etc
+void stepperMove(uint8_t left, uint8_t right){
+  uint8_t lMotorStep = 0; uint8_t rMotorStep = 0; int stepCount = 0;
+  while (stepCount < 500){
+    stepperMoveSheet(leftMotor, lMotorStep);   
+    stepperMoveSheet(rightMotor, rMotorStep);    
+    lMotorStep = (lMotorStep + left) % 8;
+    rMotorStep = (rMotorStep + right) % 8;
+    delay(3);
+    stepCount++;
   }
 }
