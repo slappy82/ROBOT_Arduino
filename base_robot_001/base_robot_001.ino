@@ -16,12 +16,12 @@
   // Pin setup for RIGHT motor
   uint8_t rightMotor[4] = {26, 27, 28, 29};
   // HM-10 BLE MODULE
-  uint8_t state = 20;
+  uint8_t state = 20;                   // Return value to determine state of HM-10 eg: if there are bytes to be read
   // Global variables used for motor
   uint8_t stepCurrent = 0;              // Starting step for stepper motor position
   uint8_t stepTotal = 0;                // Tracks the number of steps used so far in a routine
   uint8_t msDelay = 3;                  // Amount of delay (in milliseconds) between motor steps
-  uint16_t usDelay = 2500;              // Amount of delay (in microseconds)
+  uint16_t usDelay = 3000;              // Amount of delay (in microseconds)
   
   const uint8_t BASE_MOVEMENT = 37;     // 2mm worth of steps to use as a base movement unit
   const uint8_t REVERSE_VAL = 5;        // Int value to start driving motor forward
@@ -30,6 +30,9 @@
   #define console Serial     // Used to communicate with the arduino console
   #define btDevice Serial1   // Used to communicate with the HM-10 device
 
+/////////////////////////////////////////////////////////
+// SETUP METHODS
+/////////////////////////////////////////////////////////
 void robotSetup(void) {
   for (int i = 0; i < 4; i++) {
     pinMode(leftMotor[i], OUTPUT);
@@ -37,14 +40,57 @@ void robotSetup(void) {
   }
   pinMode(echo, INPUT);
   pinMode(trig, OUTPUT);
+  pinMode(state, INPUT);
 }
-
+// Setup the HM-10 module to peripheral state to begin advertisement
+void btSetup() {
+    // Initialize and set the baud rate for data transfer via UART
+    btDevice.begin(9600);
+    console.begin(9600);
+    
+    // Sends code to test bluetooth (also disconnect it from a device), if it works it should reply 'OK' 
+    btDevice.print("AT");  
+    console.println(btDevice.readString());   // receiving and printing the return code to console
+    delay(2);
+    // Return the MAC address of the adapter
+    btDevice.print("AT+ADDR?"); 
+    console.println(btDevice.readString());   
+    delay(2); 
+    // Reset the module to defaults
+    btDevice.print("AT+NOTI1"); 
+    console.println(btDevice.readString());   
+    delay(2); 
+    // Set the role of the module (slave or master)
+    btDevice.print("AT+ROLE0"); 
+    console.println(btDevice.readString());   
+    delay(2);  
+    // Set the mode of the module - restrict commands until it is connected
+    btDevice.print("AT+IMME0"); 
+    console.println(btDevice.readString());   
+    delay(2); 
+    // SReset module to allow for changes to occur
+    btDevice.print("AT+RESET"); 
+    console.println(btDevice.readString());   
+    delay(20);  
+}  
+/////////////////////////////////////////////////////////
+// SETUP
+/////////////////////////////////////////////////////////
 void setup() {
   robotSetup();
+  btSetup();
 }
-
+/////////////////////////////////////////////////////////
+// CODE
+/////////////////////////////////////////////////////////
 void loop() {
-
+  baseAI();
+}
+/////////////////////////////////////////////////////////
+// CODE METHODS
+/////////////////////////////////////////////////////////
+  // Base AI routine to loop
+void baseAI() {
   while (!readSonar()){
     while (stepTotal < BASE_MOVEMENT){
       stepperSyncMove(msDelay, FORWARD_VAL);   // speed, amount of steps (used for forwards or reverse)
@@ -64,7 +110,18 @@ void stepperSyncMove(uint8_t _delay, uint8_t steplength){
   stepCurrent = (stepCurrent + steplength) % 8;
   delay(_delay);
 }
-
+  // Take an int value for left and right motor to determine direction
+void stepperMove(uint8_t left, uint8_t right){
+  uint8_t lMotorStep = 0; uint8_t rMotorStep = 0; int stepCount = 0;
+  while (stepCount < 500){
+    stepperMoveSheet(leftMotor, lMotorStep);   
+    stepperMoveSheet(rightMotor, rMotorStep);    
+    lMotorStep = (lMotorStep + left) % 8;
+    rMotorStep = (rMotorStep + right) % 8;
+    delay(3);
+    stepCount++;
+  }
+}
   // Turn the robot to the left by 90 degrees using the stepper motors
 void stepperLeft90(){
   stepperMove(REVERSE_VAL, FORWARD_VAL);
@@ -149,19 +206,5 @@ void stepperMoveSheet(uint8_t in[], int _step){
       digitalWrite(in[1], LOW);
       digitalWrite(in[0], LOW);
       break;
-  }
-}
-
-  // Take an int value for left and right motor to determine direction
-  // TODO: Look at refactoring syncmove method here, less code duplication etc
-void stepperMove(uint8_t left, uint8_t right){
-  uint8_t lMotorStep = 0; uint8_t rMotorStep = 0; int stepCount = 0;
-  while (stepCount < 500){
-    stepperMoveSheet(leftMotor, lMotorStep);   
-    stepperMoveSheet(rightMotor, rMotorStep);    
-    lMotorStep = (lMotorStep + left) % 8;
-    rMotorStep = (rMotorStep + right) % 8;
-    delay(3);
-    stepCount++;
   }
 }
