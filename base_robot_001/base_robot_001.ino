@@ -20,12 +20,13 @@
   // Global variables used for motor
   uint8_t stepCurrent = 0;              // Starting step for stepper motor position
   uint8_t stepTotal = 0;                // Tracks the number of steps used so far in a routine
-  uint8_t msDelay = 3;                  // Amount of delay (in milliseconds) between motor steps
+  uint8_t msDelay = 2;                  // Amount of delay (in milliseconds) between motor steps
   uint16_t usDelay = 3000;              // Amount of delay (in microseconds)
   
   const uint8_t BASE_MOVEMENT = 37;     // 2mm worth of steps to use as a base movement unit
-  const uint8_t REVERSE_VAL = 5;        // Int value to start driving motor forward
-  const uint8_t FORWARD_VAL = 3;        // Int value to drive motors in reverse
+  const uint8_t REVERSE_VAL = 6;        // Int value to start driving motor forward
+  const uint8_t FORWARD_VAL = 2;        // Int value to drive motors in reverse
+  const uint8_t SONAR_PROXIMITY = 50;   // Sonar detection range in mm
 
   #define console Serial     // Used to communicate with the arduino console
   #define btDevice Serial1   // Used to communicate with the HM-10 device
@@ -91,9 +92,9 @@ void loop() {
 /////////////////////////////////////////////////////////
   // Base AI routine to loop
 void baseAI() {
-  while (!readSonar()){
+  while (!readSonar() && !checkBLEConnected()){
     while (stepTotal < BASE_MOVEMENT){
-      stepperSyncMove(msDelay, FORWARD_VAL);   // speed, amount of steps (used for forwards or reverse)
+      stepperForward(msDelay, FORWARD_VAL);   // speed, amount of steps (used for forwards or reverse)
       stepTotal++;
     }
     stepTotal = 0;
@@ -103,32 +104,83 @@ void baseAI() {
     stepperRight90(); 
   }
 }
-  // This method can be used for forward and reverse - steplength 3 for forward, steplength 5 for reverse
-void stepperSyncMove(uint8_t _delay, uint8_t steplength){
-  stepperMoveSheet(leftMotor, stepCurrent);   
-  stepperMoveSheet(rightMotor, stepCurrent);    
-  stepCurrent = (stepCurrent + steplength) % 8;
-  delay(_delay);
-}
+
   // Take an int value for left and right motor to determine direction
-void stepperMove(uint8_t left, uint8_t right){
+void stepperMove(uint8_t left, uint8_t right, uint16_t STEP_TOTAL){
   uint8_t lMotorStep = 0; uint8_t rMotorStep = 0; int stepCount = 0;
-  while (stepCount < 500){
+  while (stepCount < STEP_TOTAL){                                                // BREAK THIS OUT TO TURN METHODS
     stepperMoveSheet(leftMotor, lMotorStep);   
     stepperMoveSheet(rightMotor, rMotorStep);    
     lMotorStep = (lMotorStep + left) % 8;
     rMotorStep = (rMotorStep + right) % 8;
-    delay(3);
+    delay(msDelay);
     stepCount++;
   }
 }
+  // This method can be used for FORWARD OR REVERSE - 3 or 5 maybe sub for 2 or 6 for smoother + reduced delay???
+void stepperForward(uint8_t stepDelay, uint8_t stepDirection){
+  stepperMoveSheet(leftMotor, stepCurrent);   
+  stepperMoveSheet(rightMotor, stepCurrent);    
+  stepCurrent = (stepCurrent + stepDirection) % 8;
+  delay(stepDelay);
+}
   // Turn the robot to the left by 90 degrees using the stepper motors
 void stepperLeft90(){
-  stepperMove(REVERSE_VAL, FORWARD_VAL);
+  stepperMove(REVERSE_VAL, FORWARD_VAL, 500);
 }
   // Turn the robot to the right by 90 degrees using the stepper motors
 void stepperRight90(){
-  stepperMove(FORWARD_VAL, REVERSE_VAL);
+  stepperMove(FORWARD_VAL, REVERSE_VAL, 500);
+}
+bool checkBLEConnected() {
+   uint8_t len = btDevice.available();
+   if (len > 2) {
+      String btStatus = btDevice.readString();
+      if (btStatus.equals("OK+CONN")) {
+        btRemoteControl();
+      }
+   } 
+   else if (len == 2) {
+      byte b[2];
+      btDevice.readBytes(b, 2);
+      if (b[0] == 1 && b[1] == 1) {        
+        btRemoteControl();
+      }
+   }
+  return false;
+}
+
+// TODO: send bytes to stepperMove and determine a loop size to feel natural vs the button press duration
+void btRemoteControl() {  
+    // Listen for new input  
+    uint8_t messageLength = btDevice.available();
+    while(messageLength < 2) {   // maybe break out to new method and use pointer for return?
+      delayMicroseconds(10);
+      messageLength = btDevice.available();
+    }
+    byte newBytes[messageLength];
+    btDevice.readBytes(newBytes, messageLength);
+    // Check input for necessary flags then either send to stepperMove or back to baseAI, finally recursive call this method
+    if (messageLength == 2) {
+        if (newBytes[0] == 0 && newBytes[1] == 0) {  // Switch toggled to enable AI mode
+            baseAI();   // maybe try return??? (return to checkBLEConn method to return to baseAI if possible) ++++++++++++++++++++++
+        }
+        else if (newBytes[0] == 4 && newBytes[1] == 4) {
+            btRemoteControl();
+        }
+        else {                                      // Pass values to stepperMove for movement
+            messageLength = 0;
+            while (messageLength < 2) {
+                 stepperMove(newBytes[0], newBytes[1], 4);  // CHECK THIS - stepperMove needs to be fixed - 4 cycles until back to original (8 for 3,5)
+                 messageLength = btDevice.available();
+            }
+        }
+    }
+    else {
+        // Handle String / either recall this method or back to baseAI if conn lost NEED CHECK FOR AT COMMAND +++++++++++++++++++++
+        baseAI();  // maybe try return??? (return to checkBLEConn method to return to baseAI if possible) +++++++++++++++++++++
+    }
+    btRemoteControl();
 }
   // Read from SONAR and return TRUE if there is something close to robot (eg: 50mm)
 boolean readSonar(void){
@@ -144,7 +196,7 @@ boolean readSonar(void){
   duration = pulseIn(echo, HIGH);
     // distance = time(s) x speed of sound (m/s) / 2 (round trip is both ways)
   distance = (duration * 0.34 / 2);
-  if (distance < 50){
+  if (distance < SONAR_PROXIMITY){
     turn = true;
   }
   return turn;
