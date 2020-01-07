@@ -1,9 +1,10 @@
 // Campbell Maxwell
-// 2019
+// September 2019 - Present
 
-  //  need specsheet to get 1 step = x distance (we can get angle per step and we know radius of wheel (35mm) so opp/35mm = tan(step angle)
-  // so opp (distance per step) = 35mm * tan(5.6/64 = 0.08789) = 35*tan(0.08789) = 35*0.00153398 = 0.05369 = 0.054mm per step
-  // 1/0.054 = 18.5 steps = 1mm so going to use base movement as 2mm = 37 steps
+  /* Untidy notes: need specsheet to get 1 step = x distance (we can get angle per step and we know radius of wheel (35mm) so opp/35mm = tan(step angle)
+   * so opp (distance per step) = 35mm * tan(5.6/64 = 0.08789) = 35*tan(0.08789) = 35*0.00153398 = 0.05369 = 0.054mm per step
+   * 1/0.054 = 18.5 steps = 1mm so going to use base movement as 2mm = 37 steps
+   */
 
   // SONAR
   // Pin setup for TRIG
@@ -39,6 +40,9 @@
 /////////////////////////////////////////////////////////
 // SETUP METHODS
 /////////////////////////////////////////////////////////
+/*
+ * Setup of SONAR module
+ */
 void robotSetup(void) {
   for (int i = 0; i < 4; i++) {
     pinMode(leftMotor[i], OUTPUT);
@@ -48,7 +52,9 @@ void robotSetup(void) {
   pinMode(trig, OUTPUT);
   pinMode(state, INPUT);  // Only needed if I wish to use an interrupt
 }
-// Setup the HM-10 module to peripheral state to begin advertisement
+/*
+ * Setup the HM-10 module to peripheral state to begin advertisement
+ */
 void btSetup() {
     // Initialize and set the baud rate for data transfer via UART
     btDevice.begin(9600);
@@ -80,22 +86,11 @@ void btSetup() {
     delay(20);  
 }  
 /////////////////////////////////////////////////////////
-// SETUP
+// ROUTINE METHODS
 /////////////////////////////////////////////////////////
-void setup() {
-  robotSetup();
-  btSetup();
-}
-/////////////////////////////////////////////////////////
-// CODE
-/////////////////////////////////////////////////////////
-void loop() {
-  baseAI();
-}
-/////////////////////////////////////////////////////////
-// CODE METHODS
-/////////////////////////////////////////////////////////
-  // Base AI routine to loop
+/*
+ * Base AI routine to loop
+ */
 void baseAI() {
   while (!readSonar() && !checkBLEConnected()){
     while (stepTotal < BASE_MOVEMENT){
@@ -109,8 +104,9 @@ void baseAI() {
     stepperRight90(); 
   }
 }
-
-  // Take an int value for left and right motor to determine direction
+/*
+ * Take an int value for left and right motor to determine direction
+ */
 void stepperMove(uint8_t left, uint8_t right, const uint16_t STEP_TOTAL){
   uint8_t lMotorStep = 0; uint8_t rMotorStep = 0; int stepCount = 0;
   while (stepCount < STEP_TOTAL){                                                
@@ -122,58 +118,67 @@ void stepperMove(uint8_t left, uint8_t right, const uint16_t STEP_TOTAL){
     stepCount++;
   }
 }
-  // This method can be used for FORWARD OR REVERSE - 3 or 5 maybe sub for 2 or 6 for smoother + reduced delay???
+/*
+ * This method can be used for FORWARD OR REVERSE 
+ */
 void stepperForward(uint8_t stepDirection){
   stepperMoveSheet(leftMotor, stepCurrent);   
   stepperMoveSheet(rightMotor, stepCurrent);    
   stepCurrent = (stepCurrent + stepDirection) % 8;
   delay(MS_DELAY);
 }
-  // Turn the robot to the left by 90 degrees using the stepper motors
+/*
+ * Turn the robot to the left by 90 degrees using the stepper motors
+ */
 void stepperLeft90(){
   stepperMove(REVERSE_VAL, FORWARD_VAL, TURN_90_STEPS);
 }
-  // Turn the robot to the right by 90 degrees using the stepper motors
+/*
+ * Turn the robot to the right by 90 degrees using the stepper motors
+ */
 void stepperRight90(){
   stepperMove(FORWARD_VAL, REVERSE_VAL, TURN_90_STEPS);
 }
+/*
+ * Checks for new input to HM-10 then if it is a new connection and hands over to remote method if it is
+ */
 bool checkBLEConnected() {
-   uint8_t len = btDevice.available();
-   if (len > 2) {
+   uint8_t msgLength = btDevice.available();
+   if (msgLength > 2) {
       String btStatus = btDevice.readString();
       if (btStatus.equals("OK+CONN")) {
-        btRemoteControl();
+          console.println(btStatus);
+          while(btRemoteControl());  // looping until remote toggle or hard disconnect    
       }
    } 
-   else if (len == 2) {
-      byte b[2];
-      btDevice.readBytes(b, 2);
-      if (b[0] == 1 && b[1] == 1) {        
-        btRemoteControl();
+   else if (msgLength == 2) {
+      byte b[msgLength];
+      btDevice.readBytes(b, msgLength);
+      if (b[0] == 1 && b[1] == 1) {      
+          while(btRemoteControl());  // looping until remote toggle or hard disconnect            
       }
    }
    return false;
 }
-
-// TODO: send bytes to stepperMove and determine a loop size to feel natural vs the button press duration
-void btRemoteControl() {  
-    // Listen for new input  
-    uint8_t messageLength = btDevice.available();
-    while(messageLength < 2) {   // maybe break out to new method and use pointer for return?
-      delayMicroseconds(10);
-      messageLength = btDevice.available();
-    }
+/*
+ * Listens for input from android app then handles it accordingly, ideally making a movement call or returning to AI method
+ */
+bool btRemoteControl() {  
+    // Listen and obtain new input via HM-10 
+    uint8_t messageLength; 
+    while(delayMicroseconds(10), messageLength = btDevice.available(), messageLength < 2);
     byte newBytes[messageLength];
     btDevice.readBytes(newBytes, messageLength);
-    // Check input for necessary flags then either send to stepperMove or back to baseAI, finally recursive call this method
+    
+    // Check input for necessary flags then either send to stepperMove or return to baseAI
     if (messageLength == 2) {
-        if (newBytes[0] == 0 && newBytes[1] == 0) {  // Switch toggled to enable AI mode
-            baseAI();   // maybe try return??? (return to checkBLEConn method to return to baseAI if possible) ++++++++++++++++++++++
+        if (newBytes[0] == 0 && newBytes[1] == 0) {       // Switch toggled to enable AI mode
+            return false;                                 // Return to baseAI
         }
-        else if (newBytes[0] == 4 && newBytes[1] == 4) {
-            btRemoteControl();
+        else if (newBytes[0] == 4 && newBytes[1] == 4) {  // Code returned indicating keypress ending to stop movement loop
+            return true;                                  // Return to checkBLEConnected loop for recall for next movement
         }
-        else {                                      // Pass values to stepperMove for movement
+        else {                                            // Pass values to stepperMove for movement
             messageLength = 0;
             while (messageLength < 2) {
                  stepperMove(newBytes[0], newBytes[1], STEP_CYCLE_2_6);  
@@ -182,33 +187,34 @@ void btRemoteControl() {
         }
     }
     else {
-        // Handle String / either recall this method or back to baseAI if conn lost NEED CHECK FOR AT COMMAND +++++++++++++++++++++
-        baseAI();  // maybe try return??? (return to checkBLEConn method to return to baseAI if possible) +++++++++++++++++++++
+        String AT = btDevice.readString();
+        console.println(AT);                // Handle String need check for connection, maybe just for "OK+LOST"
+        if (AT.equals("OK+LOST")) {         // Any cleaner way to check connection???
+            return false; 
+        }  
     }
-    btRemoteControl();
+    return true;   // Return to checkBLEConnected loop for recall for next movement
 }
-  // Read from SONAR and return TRUE if there is something close to robot (eg: 50mm)
+/* 
+ *  Read from SONAR and return TRUE if there is something in proximity to robot (eg: 50mm)
+ */
 boolean readSonar(void){
-  boolean turn = false;
-     // Clears the trigPin
-  digitalWrite(trig, LOW);
-  delayMicroseconds(2);
-    // Sets the trigPin on HIGH state for 10 micro seconds
-  digitalWrite(trig, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trig, LOW);
-  int distance, duration;
-  duration = pulseIn(echo, HIGH);
-    // distance = time(s) x speed of sound (m/s) / 2 (round trip is both ways)
-  distance = (duration * 0.34 / 2);
-  if (distance < SONAR_PROXIMITY){
-    turn = true;
-  }
-  return turn;
+    digitalWrite(trig, LOW);             // Clears the trig pin
+    delayMicroseconds(2);
+    digitalWrite(trig, HIGH);            // Setting trig pin high for 10us sends the ultrasonic signal which is received to determine distance
+    delayMicroseconds(10);
+    digitalWrite(trig, LOW);
+    int distance, duration;
+    duration = pulseIn(echo, HIGH);      // Receive the duration between sending and receiving the ultrasonic signal
+    distance = (duration * 0.34 / 2);    // Distance = time(s) x speed of sound (m/s) / 2 (round trip is both ways)
+    bool turn = (distance < SONAR_PROXIMITY) ? true : false;
+    return turn;
 }
-
-void stepperMoveSheet(uint8_t in[], int _step){
-  switch(_step){
+/*
+ * Method to control state changes of pins connected to stepper. Each case is a new step configuration
+ */
+void stepperMoveSheet(uint8_t in[], int inStep){
+  switch(inStep){
     case 0:
       digitalWrite(in[3], HIGH);  // 4
       digitalWrite(in[2], LOW);   // 3
@@ -264,4 +270,17 @@ void stepperMoveSheet(uint8_t in[], int _step){
       digitalWrite(in[0], LOW);
       break;
   }
+}
+/////////////////////////////////////////////////////////
+// SETUP
+/////////////////////////////////////////////////////////
+void setup() {
+  robotSetup();
+  btSetup();
+}
+/////////////////////////////////////////////////////////
+// ROUTINE
+/////////////////////////////////////////////////////////
+void loop() {
+  baseAI();
 }
