@@ -17,10 +17,7 @@
   // Pin setup for RIGHT motor
   uint8_t rightMotor[4] = {26, 27, 28, 29};
   // HM-10 BLE MODULE
-  uint8_t state = 20;                   // Return value to determine state of HM-10 eg: if there are bytes to be read
-  // Global variables used for motor
-  uint8_t stepCurrent = 0;              // Starting step for stepper motor position
-  uint8_t stepTotal = 0;                // Tracks the number of steps used so far in a routine
+  uint8_t state = 20;                   // Determine state of HM-10 eg: if there are bytes to be read
 
   // Constant variables
   const uint8_t STEP_CYCLE_2_6 = 4;     // Amount of steps in each stepperMove loop using 2 and 6 as forward and reverse (eg every second step)
@@ -68,7 +65,7 @@ void btSetup() {
     btDevice.print("AT+ADDR?"); 
     console.println(btDevice.readString());   
     delay(2); 
-    // Reset the module to defaults
+    // Activate notifications for gaining or losing a connection (OK+CONN or OK+LOST)
     btDevice.print("AT+NOTI1"); 
     console.println(btDevice.readString());   
     delay(2); 
@@ -89,69 +86,70 @@ void btSetup() {
 // ROUTINE METHODS
 /////////////////////////////////////////////////////////
 /*
- * Base AI routine to loop
+ * Base AI routine to loop, check for incoming BLE connection and check SONAR for proximity, if neither is triggered go forwards a few steps, if
+ * BLE connection is made, transfer to remote control, if proximity is detected, turn left then right until clear
  */
 void baseAI() {
-  while (!readSonar() && !checkBLEConnected()){
-    while (stepTotal < BASE_MOVEMENT){
-      stepperForward(FORWARD_VAL);   // speed, amount of steps (used for forwards or reverse)
-      stepTotal++;
+    while (!checkBLEConnected() && !readSonar()) {
+        uint8_t stepTotal = 0;
+        while (stepTotal < BASE_MOVEMENT){
+            stepperForward(FORWARD_VAL, stepTotal); 
+            stepTotal++;
+        }
     }
-    stepTotal = 0;
-  }
-  stepperLeft90();
-  while (readSonar()){
-    stepperRight90(); 
-  }
+    stepperLeft90();
+    while (readSonar()){
+        stepperRight90(); 
+    }
 }
 /*
  * Take an int value for left and right motor to determine direction
  */
 void stepperMove(uint8_t left, uint8_t right, const uint16_t STEP_TOTAL){
-  uint8_t lMotorStep = 0; uint8_t rMotorStep = 0; int stepCount = 0;
-  while (stepCount < STEP_TOTAL){                                                
-    stepperMoveSheet(leftMotor, lMotorStep);   
-    stepperMoveSheet(rightMotor, rMotorStep);    
-    lMotorStep = (lMotorStep + left) % 8;
-    rMotorStep = (rMotorStep + right) % 8;
-    delay(MS_DELAY);
-    stepCount++;
-  }
+    uint8_t lMotorStep = 0; uint8_t rMotorStep = 0; int stepCount = 0;
+    while (stepCount < STEP_TOTAL){                                                
+        stepperMoveSheet(leftMotor, lMotorStep);   
+        stepperMoveSheet(rightMotor, rMotorStep);    
+        lMotorStep = (lMotorStep + left) % 8;
+        rMotorStep = (rMotorStep + right) % 8;
+        delay(MS_DELAY);
+        stepCount++;
+    }
 }
 /*
  * This method can be used for FORWARD OR REVERSE 
  */
-void stepperForward(uint8_t stepDirection){
-  stepperMoveSheet(leftMotor, stepCurrent);   
-  stepperMoveSheet(rightMotor, stepCurrent);    
-  stepCurrent = (stepCurrent + stepDirection) % 8;
-  delay(MS_DELAY);
+void stepperForward(uint8_t stepDirection, uint8_t stepTotalMultiplier){
+    uint16_t stepCurrent = (stepTotalMultiplier * stepDirection) % 8;
+    stepperMoveSheet(leftMotor, stepCurrent);   
+    stepperMoveSheet(rightMotor, stepCurrent);    
+    delay(MS_DELAY);
 }
 /*
  * Turn the robot to the left by 90 degrees using the stepper motors
  */
 void stepperLeft90(){
-  stepperMove(REVERSE_VAL, FORWARD_VAL, TURN_90_STEPS);
+    stepperMove(REVERSE_VAL, FORWARD_VAL, TURN_90_STEPS);
 }
 /*
  * Turn the robot to the right by 90 degrees using the stepper motors
  */
 void stepperRight90(){
-  stepperMove(FORWARD_VAL, REVERSE_VAL, TURN_90_STEPS);
+    stepperMove(FORWARD_VAL, REVERSE_VAL, TURN_90_STEPS);
 }
 /*
  * Checks for new input to HM-10 then if it is a new connection and hands over to remote method if it is
  */
 bool checkBLEConnected() {
    uint8_t msgLength = btDevice.available();
-   if (msgLength > 2) {
+   if (msgLength > 2) {              // If data on HM-10 is in String format get it and check it identifies a new connection
       String btStatus = btDevice.readString();
       if (btStatus.equals("OK+CONN")) {
           console.println(btStatus);
           while(btRemoteControl());  // looping until remote toggle or hard disconnect    
       }
    } 
-   else if (msgLength == 2) {
+   else if (msgLength == 2) {        // If data on HM-10 is in my movement instruction format check it identifies retaking remote control
       byte b[msgLength];
       btDevice.readBytes(b, msgLength);
       if (b[0] == 1 && b[1] == 1) {      
@@ -179,18 +177,16 @@ bool btRemoteControl() {
             return true;                                  // Return to checkBLEConnected loop for recall for next movement
         }
         else {                                            // Pass values to stepperMove for movement
-            messageLength = 0;
-            while (messageLength < 2) {
+            while (messageLength = btDevice.available(), messageLength < 2) {
                  stepperMove(newBytes[0], newBytes[1], STEP_CYCLE_2_6);  
-                 messageLength = btDevice.available();
             }
         }
     }
     else {
         String AT = btDevice.readString();
         console.println(AT);                // Handle String need check for connection, maybe just for "OK+LOST"
-        if (AT.equals("OK+LOST")) {         // Any cleaner way to check connection???
-            return false; 
+        if (AT.equals("OK+LOST")) {         // Means connection has been lost (ensure AT+NOTI is enabled - AT+NOTI1)
+            return false;                   // Return to baseAI
         }  
     }
     return true;   // Return to checkBLEConnected loop for recall for next movement
