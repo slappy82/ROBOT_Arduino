@@ -1,38 +1,33 @@
 // Campbell Maxwell
 // September 2019 - Present
-
-  /* Untidy notes: need specsheet to get 1 step = x distance (we can get angle per step and we know radius of wheel (35mm) so opp/35mm = tan(step angle)
-   * so opp (distance per step) = 35mm * tan(5.6/64 = 0.08789) = 35*tan(0.08789) = 35*0.00153398 = 0.05369 = 0.054mm per step
-   * 1/0.054 = 18.5 steps = 1mm so going to use base movement as 2mm = 37 steps
-   */
-
-  // SONAR
+      
+// SONAR
   // Pin setup for TRIG
-  uint8_t trig = 3;   
+uint8_t trig = 3;   
   // Pin setup for ECHO 
-  uint8_t echo = 2;  
-  // STEPPER MOTORS
+uint8_t echo = 2;  
+// STEPPER MOTORS
   // Pin setup for LEFT motor
-  uint8_t leftMotor[4] = {22, 23, 24, 25};
+uint8_t leftMotor[4] = {22, 23, 24, 25};
   // Pin setup for RIGHT motor
-  uint8_t rightMotor[4] = {26, 27, 28, 29};
-  // HM-10 BLE MODULE
-  uint8_t state = 20;                   // Determine state of HM-10 eg: if there are bytes to be read
+uint8_t rightMotor[4] = {26, 27, 28, 29};
+// HM-10 BLE MODULE
+uint8_t state = 20;                   // Determine state of HM-10 eg: if there are bytes to be read
 
   // Constant variables
-  const uint8_t STEP_CYCLE_2_6 = 4;     // Amount of steps in each stepperMove loop using 2 and 6 as forward and reverse (eg every second step)
-  const uint8_t STEP_CYCLE_3_5 = 8;     // Amount of steps using 3 and 5 (eg every 3rd step - needs longer delay)
-  const uint8_t BASE_MOVEMENT = 37;     // 2mm worth of steps to use as a base movement unit
-  const uint8_t REVERSE_VAL = 6;        // Int value to start driving motor forward
-  const uint8_t FORWARD_VAL = 2;        // Int value to drive motors in reverse
-  const uint8_t SONAR_PROXIMITY = 50;   // Sonar detection range in mm
-  const uint8_t MS_DELAY = 2;           // Amount of delay (in milliseconds) between motor steps
-  const uint16_t US_DELAY = 2000;       // Amount of delay (in microseconds)
-  const uint16_t TURN_90_STEPS = 500;   /* Amount of steps for 90 degree turn in stepperMove loop (for actual value need length of 45* of circle with 
+const uint8_t STEP_CYCLE_2_6 = 4;     // Amount of steps in each stepperMove loop using 2 and 6 as forward and reverse (eg every second step)
+const uint8_t STEP_CYCLE_3_5 = 8;     // Amount of steps using 3 and 5 (eg every 3rd step - needs longer delay)
+const uint8_t BASE_MOVEMENT = 37;     // 2mm worth of steps to use as a base movement unit
+const uint8_t REVERSE_VAL = 6;        // Int value to start driving motor forward
+const uint8_t FORWARD_VAL = 2;        // Int value to drive motors in reverse
+const uint8_t SONAR_PROXIMITY = 50;   // Sonar detection range in mm
+const uint8_t MS_DELAY = 2;           // Amount of delay (in milliseconds) between motor steps
+const uint16_t US_DELAY = 2000;       // Amount of delay (in microseconds)
+const uint16_t TURN_90_STEPS = 500;   /* Amount of steps for 90 degree turn in stepperMove loop (for actual value need length of 45* of circle with 
                                            radius = distance between wheels / 2, then just number of steps for that distance*/
 
-  #define console Serial     // Used to communicate with the arduino console
-  #define btDevice Serial1   // Used to communicate with the HM-10 device
+#define console Serial     // Used to communicate with the arduino console
+#define btDevice Serial1   // Used to communicate with the HM-10 device
 
 /////////////////////////////////////////////////////////
 // SETUP METHODS
@@ -41,13 +36,13 @@
  * Setup of SONAR module
  */
 void robotSetup(void) {
-  for (int i = 0; i < 4; i++) {
-    pinMode(leftMotor[i], OUTPUT);
-    pinMode(rightMotor[i], OUTPUT);
-  }
-  pinMode(echo, INPUT);
-  pinMode(trig, OUTPUT);
-  pinMode(state, INPUT);  // Only needed if I wish to use an interrupt
+    for (int i = 0; i < 4; i++) {
+        pinMode(leftMotor[i], OUTPUT);
+        pinMode(rightMotor[i], OUTPUT);
+    }
+    pinMode(echo, INPUT);
+    pinMode(trig, OUTPUT);
+    pinMode(state, INPUT);  // Only needed if I wish to use an interrupt
 }
 /*
  * Setup the HM-10 module to peripheral state to begin advertisement
@@ -149,7 +144,7 @@ bool checkBLEConnected() {
           while(btRemoteControl());  // looping until remote toggle or hard disconnect    
       }
    } 
-   else if (msgLength == 2) {        // If data on HM-10 is in my movement instruction format check it identifies retaking remote control
+   else if (msgLength == 2) {        // If data on HM-10 is in my movement instruction format, check it for remote control command
       byte b[msgLength];
       btDevice.readBytes(b, msgLength);
       if (b[0] == 1 && b[1] == 1) {      
@@ -202,68 +197,68 @@ boolean readSonar(void){
     digitalWrite(trig, LOW);
     int distance, duration;
     duration = pulseIn(echo, HIGH);      // Receive the duration between sending and receiving the ultrasonic signal
-    distance = (duration * 0.34 / 2);    // Distance = time(s) x speed of sound (m/s) / 2 (round trip is both ways)
-    bool turn = (distance < SONAR_PROXIMITY) ? true : false;
+    distance = (duration * 0.34 / 2);    // Distance = time(s) x speed of sound (m/s) / 2 (round trip is both ways and converting to mm)
+    bool turn = distance < SONAR_PROXIMITY;
     return turn;
 }
 /*
  * Method to control state changes of pins connected to stepper. Each case is a new step configuration
  */
-void stepperMoveSheet(uint8_t in[], int inStep){
-  switch(inStep){
+void stepperMoveSheet(uint8_t motor[], int motorStep){
+  switch(motorStep){
     case 0:
-      digitalWrite(in[3], HIGH);  // 4
-      digitalWrite(in[2], LOW);   // 3
-      digitalWrite(in[1], LOW);   // 2
-      digitalWrite(in[0], LOW);   // 1
+      digitalWrite(motor[3], HIGH);  // 4
+      digitalWrite(motor[2], LOW);   // 3
+      digitalWrite(motor[1], LOW);   // 2
+      digitalWrite(motor[0], LOW);   // 1
       break;
     case 1:
-      digitalWrite(in[3], HIGH);
-      digitalWrite(in[2], HIGH);
-      digitalWrite(in[1], LOW);
-      digitalWrite(in[0], LOW);
+      digitalWrite(motor[3], HIGH);
+      digitalWrite(motor[2], HIGH);
+      digitalWrite(motor[1], LOW);
+      digitalWrite(motor[0], LOW);
       break;
     case 2:
-      digitalWrite(in[3], LOW);
-      digitalWrite(in[2], HIGH);
-      digitalWrite(in[1], LOW);
-      digitalWrite(in[0], LOW);
+      digitalWrite(motor[3], LOW);
+      digitalWrite(motor[2], HIGH);
+      digitalWrite(motor[1], LOW);
+      digitalWrite(motor[0], LOW);
       break;
     case 3:
-      digitalWrite(in[3], LOW);
-      digitalWrite(in[2], HIGH);
-      digitalWrite(in[1], HIGH);
-      digitalWrite(in[0], LOW);
+      digitalWrite(motor[3], LOW);
+      digitalWrite(motor[2], HIGH);
+      digitalWrite(motor[1], HIGH);
+      digitalWrite(motor[0], LOW);
       break;
     case 4:
-      digitalWrite(in[3], LOW);
-      digitalWrite(in[2], LOW);
-      digitalWrite(in[1], HIGH);
-      digitalWrite(in[0], LOW);
+      digitalWrite(motor[3], LOW);
+      digitalWrite(motor[2], LOW);
+      digitalWrite(motor[1], HIGH);
+      digitalWrite(motor[0], LOW);
       break;
     case 5:
-      digitalWrite(in[3], LOW);
-      digitalWrite(in[2], LOW);
-      digitalWrite(in[1], HIGH);
-      digitalWrite(in[0], HIGH);
+      digitalWrite(motor[3], LOW);
+      digitalWrite(motor[2], LOW);
+      digitalWrite(motor[1], HIGH);
+      digitalWrite(motor[0], HIGH);
       break;
     case 6:
-      digitalWrite(in[3], LOW);
-      digitalWrite(in[2], LOW);
-      digitalWrite(in[1], LOW);
-      digitalWrite(in[0], HIGH);
+      digitalWrite(motor[3], LOW);
+      digitalWrite(motor[2], LOW);
+      digitalWrite(motor[1], LOW);
+      digitalWrite(motor[0], HIGH);
       break;
     case 7:
-      digitalWrite(in[3], HIGH);
-      digitalWrite(in[2], LOW);
-      digitalWrite(in[1], LOW);
-      digitalWrite(in[0], HIGH);
+      digitalWrite(motor[3], HIGH);
+      digitalWrite(motor[2], LOW);
+      digitalWrite(motor[1], LOW);
+      digitalWrite(motor[0], HIGH);
       break;
     default:
-      digitalWrite(in[3], LOW);
-      digitalWrite(in[2], LOW);
-      digitalWrite(in[1], LOW);
-      digitalWrite(in[0], LOW);
+      digitalWrite(motor[3], LOW);
+      digitalWrite(motor[2], LOW);
+      digitalWrite(motor[1], LOW);
+      digitalWrite(motor[0], LOW);
       break;
   }
 }
@@ -271,12 +266,18 @@ void stepperMoveSheet(uint8_t in[], int inStep){
 // SETUP
 /////////////////////////////////////////////////////////
 void setup() {
-  robotSetup();
-  btSetup();
+    robotSetup();
+    btSetup();
 }
 /////////////////////////////////////////////////////////
 // ROUTINE
 /////////////////////////////////////////////////////////
 void loop() {
-  baseAI();
+    baseAI();
 }
+
+
+  /* Untidy notes: need specsheet to get 1 step = x distance (we can get angle per step and we know radius of wheel (35mm) so 
+   * opp/35mm = tan(step angle) so opp (distance per step) = 35mm * tan(5.6/64 = 0.08789) = 35*tan(0.08789) = 35*0.00153398 = 
+   * 0.05369 = 0.054mm per step 1/0.054 = 18.5 steps = 1mm so going to use base movement as 2mm = 37 steps
+   */
