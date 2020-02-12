@@ -31,6 +31,10 @@
  *      Will be able to refactor this when I have it mounted and know the exact height, desired starting angle, and any offsets.
  *      Also considering a non-linear approach to angular intervals, as approaching 90* each degree will cover an exponentially increasing horizontal 
  *      range, so increased accuracy will be more important approaching 90*.
+ *      
+ *      1980 = 90*
+ *      
+ *      900 = 0*
  */
 
 //using namespace std;
