@@ -1,4 +1,4 @@
-# ARDUINO_robot_001
+# ROBOT_Arduino
 Arduino program for robot to interface with BLE android app
 App to control and communicate with my robot
 
