@@ -8,24 +8,22 @@
 /*
  * Constructor for BLE_Communication_Module class
  */
-BLE_Communication_Module::BLE_Communication_Module() : BLE_STATE_PIN(20),
+BLE_Communication_Module::BLE_Communication_Module() : BLE_STATE_PIN(4),
                                                        LEFT(0),
-                                                       RIGHT(1) {
+                                                       RIGHT(1) {                                                 
 }
 /*
  * Setup the HM-10 module to peripheral state to begin advertisement
  */
 void BLE_Communication_Module::BLESetup() {
-    // Setup the interrupt pin
-    pinMode(BLE_STATE_PIN, INPUT);  // Only needed if I wish to use an interrupt
-
     // Initialize and set the baud rate for data transfer via UART
     btDevice.begin(9600);
     console.begin(9600);
-    
+
+    // Configure settings for HM-10 unit
     // Sends code to test bluetooth (also disconnect it from a device), if it works it should reply 'OK' 
     btDevice.print("AT");  
-    console.println(btDevice.readString());   // receiving and printing the return code to console
+    console.println(btDevice.readString());  
     delay(2);
     // Return the MAC address of the adapter
     btDevice.print("AT+ADDR?"); 
@@ -47,56 +45,39 @@ void BLE_Communication_Module::BLESetup() {
     btDevice.print("AT+RESET"); 
     console.println(btDevice.readString());   
     delay(20);  
+    
+    // Setup the interrupt / status pin
+    pinMode(BLE_STATE_PIN, INPUT);          // Needed if I wish to use an interrupt on connection (HIGH when connected, LOW otherwise)  
+    
     // Initialise member variables
-    isConnected = false;
-    currentCommand = 0;
+    packetType = 255;                       // Set to highest value to pass as true and go to default in baseAI switch case
     packetData[0] = 0;
     packetData[1] = 0;
 }  
 /*
- * Checks if a connection has been made to the HM-10 unit and sets / returns appropriate member statuses. Calls BLERemoteControl method if
- * connection has already been made to listen for and return the next packet
- * @return - Uint8_t containing the data portion of the last packet
+ * Checks if a connection has been made to the HM-10 unit and sets / returns appropriate member statuses. Sets packetType to let base module send
+ * packet data to the correct module. Copies packet data to the packetData variable.
+ * @return - True if android has paired, FALSE if not
  */
-uint8_t BLE_Communication_Module::checkBLEConnection() {
-    if (!isConnected) {                                     
-        if (btDevice.available() > 0) {      
-            String btStatus = btDevice.readString();
-            if (btStatus.equals("OK+CONN")) {
-                console.println(btStatus); 
-                isConnected = true; 
-                currentCommand = 1;
-                return currentCommand;                                   // Set to non-zero to pass as true as listener call no longer blocks
-            }
-        }
-        return currentCommand;
-    }
-    return BLE_Communication_Module::BLERemoteControl();
-}
-/*
- * Listens for input from android app then handles it accordingly, ideally making a movement call or returning to AI method
- * @return - Uint8_t containing the data portion of the last packet
- */
-uint8_t BLE_Communication_Module::BLERemoteControl() {  
-    uint8_t messageLength = btDevice.available();   
-    //console.println("test connected");
-    if (messageLength > 0) {
-        // Check input for necessary flags  **could either halt for 0x44 or just continue regardless**
-        if (messageLength == 2) {   
+bool BLE_Communication_Module::checkBLEConnection() {
+    bool isConnected = BLE_Communication_Module::isBLEConnected();
+    if (isConnected) {                                     
+        uint8_t messageLength = btDevice.available();   
+        if (messageLength > 0) {                                        // Putting this here to reduce impact (more likely no new packet sent)
+            if (messageLength == 2) {   
                 byte newBytes[messageLength];
-                btDevice.readBytes(newBytes, messageLength);                                                       
-                currentCommand = BLE_Communication_Module::compressPacket(newBytes);                        // Return data compressed into 1 byte
+                btDevice.readBytes(newBytes, messageLength);
+                //packetType = (uint8_t)newBytes[0];                    // correct call to set packet type variable
+                //BLE_Communication_Module::decodeByte(newBytes[1])     // correct call to depackage data of packet ready for appropriate module                                                  
+                packetData[0] = (uint8_t)newBytes[0];        // Used until packet protocol fixed on android end+++++++++
+                packetData[1] = (uint8_t)newBytes[1];        // Used until packet protocol fixed on android end+++++++++
             }
-        else {
-            String AT = btDevice.readString();
-            console.println(AT);                                                // Print message 
-            if (AT.equals("OK+LOST")) {                                         // Connection has been lost (ensure AT+NOTI is enabled - AT+NOTI1)
-                isConnected = false;
-                currentCommand = 0;
-            }  
-        }
+            else {
+                console.println(btDevice.readString());                 // Print message to console 
+            }
+        }  
     }
-    return currentCommand;                                                         
+    return isConnected;                              
 }
 /*
  * Method to compress 2 byte packet to a single byte (3 and 4 would become 0x34). Only needed until I fix android component to send 1 byte packet
@@ -105,7 +86,7 @@ uint8_t BLE_Communication_Module::BLERemoteControl() {
  * @param data - Byte array containing a full packet sent via BLE
  * @return - Uint8_t containing the data portion of the packet parameter
  */
-uint8_t BLE_Communication_Module::compressPacket(byte data[]) {
+byte BLE_Communication_Module::compressPacket(byte data[]) {
     return ((data[0]*16)+data[1]);
 }
 /*
@@ -113,7 +94,32 @@ uint8_t BLE_Communication_Module::compressPacket(byte data[]) {
  * @param data - The original 'packet' to be split into two bytes
  * @return - Uint8_t pointer pointing to a two element array containing the two new bytes
  */
-void BLE_Communication_Module::decodeByte(uint8_t data) {
-    packetData[0] = data / 16;
-    packetData[1] = 0x0f & data; 
+void BLE_Communication_Module::decodeByte(byte data) {
+    packetData[0] = (uint8_t)(data / 16);
+    packetData[1] = (uint8_t)(0x0f & data); 
+}
+/*
+ * Checks the state pin to see if pairing has been made with HM-10 unit
+ * @return - Return TRUE if connected to android, FALSE if not
+ */
+bool BLE_Communication_Module::isBLEConnected() {
+    if (digitalRead(BLE_STATE_PIN) == HIGH) {
+        return true;
+    }
+    return false;
+}
+/*
+ * Read only return for the packet type value of the last packet
+ * @return - Uint8_t value stored in packetType variable - the type of the last packet
+ */
+uint8_t BLE_Communication_Module::getPacketType() {
+    return packetType;
+}
+/*
+ * Read only return for a portion of the packet data
+ * @param - The index of the part of data to receive
+ * @return - The data portion of the last packet's data
+ */
+uint8_t BLE_Communication_Module::getPacketData(uint8_t dataIndex) {
+    return packetData[dataIndex];
 }

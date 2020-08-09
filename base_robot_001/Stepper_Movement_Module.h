@@ -31,7 +31,10 @@
         const uint8_t MOVE_FORWARD;                             // Int value to drive motors in reverse
         const uint8_t MOVE_STOP;                                // Int value which will stop motor movement
     // FUNCTIONS
-        Stepper_Movement_Module();                              // Constructor will initialise the pins and handle any initial setup required for this class
+        /*
+         * Constructor will initialise the pins and handle any initial setup required for this class
+         */
+        Stepper_Movement_Module();                             
         /*
          * Called to setup this module
          */

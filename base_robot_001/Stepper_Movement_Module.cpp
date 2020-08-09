@@ -19,7 +19,6 @@ Stepper_Movement_Module::Stepper_Movement_Module() : STEP_CYCLE_2_6(4),
                                                      US_DELAY(2000),     
                                                      LEFT_MOTOR_PINS({22, 23, 24, 25}),
                                                      RIGHT_MOTOR_PINS({26, 27, 28, 29}) {
-    //Stepper_Movement_Module::stepperSetup();
 }
 /*
  * Sets up the pins which connect to each motor, and anything else this module requires
@@ -55,9 +54,7 @@ void Stepper_Movement_Module::stepperMove(uint8_t left, uint8_t right, const uin
  * @param right - The direction value for the RIGHT hand motor
  */
 void Stepper_Movement_Module::stepperBLEMove(uint8_t left, uint8_t right){
-    if (left > 1 && right > 1 && left != 4) {                    // replace this when I fix packets on android end, eg: can have a bit switch 
-        /*Serial.println(left);
-        Serial.println(right);*/
+    if (left >= MOVE_FORWARD && right >= MOVE_FORWARD && left != MOVE_STOP) {                   // replace this when I fix packets on android end, eg: can have a bit switch 
         Stepper_Movement_Module::stepperMove(left, right, BASE_MOVEMENT);   
     }
 }

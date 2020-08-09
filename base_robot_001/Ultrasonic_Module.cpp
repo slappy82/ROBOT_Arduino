@@ -11,7 +11,6 @@
 Ultrasonic_Module::Ultrasonic_Module() : TRIG_PIN(3), 
                                          ECHO_PIN(2), 
                                          PWM_PIN(5) {
-    //Ultrasonic_Module::ultrasonicSetup();
 }
 /*
  * Method to setup pin assignment and anything else needed for this module to run

@@ -23,7 +23,10 @@
 
     public:
     // FUNCTIONS
-        Ultrasonic_Module();                    // Constructor will initialise the pins and handle any initial setup required for this class
+        /*
+         * Constructor will initialise the pins and handle any initial setup required for this class
+         */
+        Ultrasonic_Module();                    
         /*
          * Called to setup this module
          */

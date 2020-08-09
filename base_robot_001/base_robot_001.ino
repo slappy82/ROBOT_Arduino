@@ -19,10 +19,14 @@ Ultrasonic_Module sonarModule;
  * BLE connection is made, transfer to remote control, if proximity is detected, turn left then right until clear
  */
 void baseAI() {
-    uint8_t BLEMoveCommand;
-    while (BLEMoveCommand = BLEModule.checkBLEConnection(), BLEMoveCommand) {
-        BLEModule.decodeByte(BLEMoveCommand);             // +++currently convuluted method of passing packet, need to fix android side also redundant++++
-        motorModule.stepperBLEMove(BLEModule.packetData[BLEModule.LEFT], BLEModule.packetData[BLEModule.RIGHT]);   
+    while (BLEModule.checkBLEConnection() && BLEModule.getPacketType()) {
+        /*switch(BLEModule.getPacketType()) {                     // correct checking for packet type - need to fix protocol on android end first
+            case BLEModule.MOVEMENT_MODULE:*/
+                motorModule.stepperBLEMove(BLEModule.getPacketData(BLEModule.LEFT), BLEModule.getPacketData(BLEModule.RIGHT));  
+                /*break;
+            default:
+                break; 
+        }*/
     }
     if (sonarModule.noCollisionImminent()) {
         motorModule.stepperAutoLinear(motorModule.MOVE_FORWARD); 
