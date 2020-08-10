@@ -54,7 +54,7 @@ void Stepper_Movement_Module::stepperMove(uint8_t left, uint8_t right, const uin
  * @param right - The direction value for the RIGHT hand motor
  */
 void Stepper_Movement_Module::stepperBLEMove(uint8_t left, uint8_t right){
-    if (left >= MOVE_FORWARD && right >= MOVE_FORWARD && left != MOVE_STOP) {                   // replace this when I fix packets on android end, eg: can have a bit switch 
+    if (left == MOVE_FORWARD || left == MOVE_REVERSE) {                   // replace this when I fix packets on android end, eg: can have a bit switch 
         Stepper_Movement_Module::stepperMove(left, right, BASE_MOVEMENT);   
     }
 }
@@ -63,7 +63,7 @@ void Stepper_Movement_Module::stepperBLEMove(uint8_t left, uint8_t right){
  * @param stepDirection - The direction value for BOTH motors (eg: a linear movement)
  */
 void Stepper_Movement_Module::stepperAutoLinear(uint8_t stepDirection) {
-    Stepper_Movement_Module::stepperMove(stepDirection, stepDirection, (BASE_MOVEMENT * 2));    // Give it more action per cycle
+    Stepper_Movement_Module::stepperMove(stepDirection, stepDirection, BASE_MOVEMENT);    // Give it more action per cycle
 }
 /*
  * Turn the robot to the left by 90 degrees using the stepper motors (for automatic AI control)

@@ -50,7 +50,7 @@ void BLE_Communication_Module::BLESetup() {
     pinMode(BLE_STATE_PIN, INPUT);          // Needed if I wish to use an interrupt on connection (HIGH when connected, LOW otherwise)  
     
     // Initialise member variables
-    packetType = 255;                       // Set to highest value to pass as true and go to default in baseAI switch case
+    packetType = 254;                       // Set to highest value to pass as true and go to default in baseAI switch case
     packetData[0] = 0;
     packetData[1] = 0;
 }  
@@ -63,19 +63,14 @@ bool BLE_Communication_Module::checkBLEConnection() {
     bool isConnected = BLE_Communication_Module::isBLEConnected();
     if (isConnected) {                                     
         uint8_t messageLength = btDevice.available();   
-        if (messageLength > 0) {                                        // Putting this here to reduce impact (more likely no new packet sent)
-            if (messageLength == 2) {   
-                byte newBytes[messageLength];
-                btDevice.readBytes(newBytes, messageLength);
-                //packetType = (uint8_t)newBytes[0];                    // correct call to set packet type variable
-                //BLE_Communication_Module::decodeByte(newBytes[1])     // correct call to depackage data of packet ready for appropriate module                                                  
-                packetData[0] = (uint8_t)newBytes[0];        // Used until packet protocol fixed on android end+++++++++
-                packetData[1] = (uint8_t)newBytes[1];        // Used until packet protocol fixed on android end+++++++++
-            }
-            else {
-                console.println(btDevice.readString());                 // Print message to console 
-            }
-        }  
+        if (messageLength == 2) {   
+            byte newBytes[messageLength];
+            btDevice.readBytes(newBytes, messageLength);
+            //packetType = (uint8_t)newBytes[0];                    // correct call to set packet type variable
+            //BLE_Communication_Module::decodeByte(newBytes[1])     // correct call to depackage data of packet ready for appropriate module                                                  
+            packetData[0] = (uint8_t)newBytes[0];        // Used until packet protocol fixed on android end+++++++++
+            packetData[1] = (uint8_t)newBytes[1];        // Used until packet protocol fixed on android end+++++++++
+        } 
     }
     return isConnected;                              
 }
