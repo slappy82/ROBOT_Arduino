@@ -37,11 +37,13 @@
  *      900 = 0*
  */
 
+// Above table and calculations were so half assed, eyeballing a compact cheap protractor not even fixed in place, then going 3dp for some calculated values
+
 //using namespace std;
 
 const float ADJUSTED_DIVISOR = 11.76f;          // Adjusted average value found from the above table
 const uint8_t PWM_PIN = 5;                      // PWM output pin to servo
-const uint8_t TOTAL_LOOPS = 5;                  // Ideal number of loops seems to be 5 to guarantee full stator rotation
+const uint8_t TOTAL_LOOPS = 5;                  // Ideal number of loops seems to be 5 to guarantee full stator rotation - shitty solution for single threading
 const uint16_t PWM_PERIOD = 20000;              // Period for the PWM functionality
 uint16_t pwmWidth;                              // Max is 2700, min is 300  going to use safe range as 500 - 2550 for exactly 180* 
 uint8_t loops;
@@ -66,7 +68,7 @@ void loop() {
     }
     loops = 0;
     uint8_t len;
-    while (len = Serial.available(), len > 0) {
+    while (len = Serial.available(), len > 0) {    // Why not 'while (Serial.available()) {' as x=0 is falsey and x>0 true? Consolidates all the sanity checks?
         byte b = Serial.read();
         if (b > 47 && b < 58) {
             val *= 10;
